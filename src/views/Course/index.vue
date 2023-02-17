@@ -5,8 +5,18 @@
       <div class="filter-item">
         <div class="item-title">课程方向：</div>
         <ul>
-          <li class="filter-all">全部</li>
-          <li v-for="item1 in category1List" :key="item1.id">
+          <li
+            :class="activeIndex1 == '1' ? 'filter-all' : ''"
+            @click="checkCategory1All"
+          >
+            全部
+          </li>
+          <li
+            v-for="item1 in category1List"
+            :key="item1.id"
+            @click="checkCategory1(item1.id)"
+            :class="activeIndex1 == item1.id ? 'filter-all' : ''"
+          >
             {{ item1.categoryName }}
           </li>
         </ul>
@@ -14,8 +24,18 @@
       <div class="filter-item">
         <div class="item-title">课程分类：</div>
         <ul class="filter-ul">
-          <li class="filter-all">全部</li>
-          <li v-for="item2 in category2List" :key="item2.id">
+          <li
+            :class="activeIndex2 == '2' ? 'filter-all' : ''"
+            @click="checkCategory2All"
+          >
+            全部
+          </li>
+          <li
+            v-for="item2 in category2List"
+            :key="item2.id"
+            @click="checkCategory2(item2.id)"
+            :class="activeIndex2 == item2.id ? 'filter-all' : ''"
+          >
             {{ item2.categoryName }}
           </li>
         </ul>
@@ -23,8 +43,20 @@
       <div class="filter-item">
         <div class="item-title">课程难度：</div>
         <ul>
-          <li class="filter-all">全部</li>
-          <li v-for="item3 in levelList" :key="item3.id">{{ item3.name }}</li>
+          <li
+            :class="activeIndex3 == '0' ? 'filter-all' : ''"
+            @click="checkLevelAll"
+          >
+            全部
+          </li>
+          <li
+            v-for="item3 in levelList"
+            :key="item3.id"
+            :class="activeIndex3 == item3.id ? 'filter-all' : ''"
+            @click="checkLevel(item3.id)"
+          >
+            {{ item3.name }}
+          </li>
         </ul>
       </div>
     </div>
@@ -33,23 +65,35 @@
     <div class="list-main">
       <div class="list-t">
         <ul>
-          <li>综合</li>
-          <li>|</li>
-          <li>最新课程</li>
-          <li>|</li>
-          <li>最多购买</li>
-          <li>|</li>
-          <li>
-            <span>价格</span>
-            <div class="caret">
-              <el-icon :size="8"><CaretTop /></el-icon>
-              <el-icon :size="8"><CaretBottom /></el-icon>
+          <li
+            v-for="(item, index) in sortList"
+            :key="item.id"
+            @click="changeSort(item)"
+          >
+            <span :class="sortIndex == item.id ? 'sort' : ''">{{
+              item.name
+            }}</span>
+            <i v-if="index !== 3">|</i>
+            <div class="caret" v-if="index === 3">
+              <el-icon :size="8" :color="sortTop ? '#388fff' : ''"
+                ><CaretTop
+              /></el-icon>
+              <el-icon :size="8" :color="!sortTop ? '#388fff' : ''"
+                ><CaretBottom
+              /></el-icon>
             </div>
           </li>
         </ul>
         <div>
-          <el-checkbox label="免费课程" />
-          <el-checkbox label="会员免费课程" />
+          <el-radio-group
+            size="small"
+            v-model="radioValue"
+            @change="handeleRadio"
+          >
+            <el-radio-button label="全部课程" />
+            <el-radio-button label="免费课程" />
+            <el-radio-button label="会员课程" />
+          </el-radio-group>
         </div>
       </div>
       <ul class="list-c">
@@ -58,7 +102,8 @@
           <div class="course-content">
             <h3>{{ course.courseName }}</h3>
             <div>
-              {{ useLevel(courseLevel).value }} · {{ course.clicks }}人报名
+              {{ useLevel(course.courseLevel).value }} ·
+              {{ course.clicks }}人报名
             </div>
             <div class="price">
               <div class="price-vip">
@@ -70,7 +115,12 @@
         </li>
       </ul>
       <div class="list-b">
-        <el-pagination background layout="prev, pager, next" :total="1000" />
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          :total="courseListTotal"
+          @current-change="handeleCurrent"
+        />
       </div>
     </div>
   </div>
@@ -88,12 +138,17 @@ import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 // 引入判断等级的hooks
 import useLevel from '@/hooks/useLevel'
 
+// 判断选中的类名
+let activeIndex1 = ref('1')
+let activeIndex2 = ref('2')
+let activeIndex3 = ref('0')
+
 // 获取全局挂载方便获取接口
 const { proxy } = getCurrentInstance()
 const api = proxy.$api
 
-// 整理课程对象
-const courseOption = reactive({
+// 整理课程对象这是一个空对象
+const courseOption = () => ({
   pageNum: 1, // 页码
   pageSize: 8, // 一页的数量
   entity: {
@@ -101,9 +156,12 @@ const courseOption = reactive({
     secondCategory: '', // 二级分类id
     isMember: '', // 会员课程（传1）
     isFree: '', // 免费课程（传1）
-    sortBy: '' // 排序
+    sortBy: '', // 排序
+    courseLevel: '' // 课程等级
   }
 })
+// 复制出来的对象
+const courseFn = reactive(courseOption())
 
 // 一级分类菜单
 let category1List = ref([])
@@ -119,8 +177,8 @@ getCategory1()
 // 二级分类菜单
 let category2List = ref([])
 // 获取二级列表
-const getCategory2 = async () => {
-  const categoryId = -1
+const getCategory2 = async (id = -1) => {
+  let categoryId = id
   const result = await api.reqCategory2({ categoryId })
   if (result.data.meta.code == 200) {
     category2List.value = result.data.data.list
@@ -134,18 +192,127 @@ let levelList = reactive([
   { id: 2, name: '中级' },
   { id: 3, name: '高级' }
 ])
+
 // 课程列表
 let courseList = ref([])
+let courseListTotal = ref(0)
 // 获取课程列表
-const getCourseList = async (courseOption) => {
-  const result = await api.reqCourse(courseOption)
+const getCourseList = async (courseFn) => {
+  const result = await api.reqCourse(courseFn)
   if (result.data.meta.code == 200) {
     courseList.value = result.data.data.pageInfo.list
+    courseListTotal.value = result.data.data.pageInfo.total
   }
 }
 // 获取课程列表
-getCourseList(courseOption)
-</script>
+getCourseList(courseFn)
+
+// 选中一级菜单的事件
+const checkCategory1 = (id1) => {
+  // 切换class
+  activeIndex1.value = id1
+  courseFn.entity.secondCategory = ''
+  courseFn.entity.firstCategory = id1
+  // 重新获取二级列表
+  getCategory2(id1)
+  getCourseList(courseFn)
+  console.log(courseFn, '111')
+}
+
+// 选中二级菜单的事件
+const checkCategory2 = (id2) => {
+  // 切换class
+  activeIndex2.value = id2
+  courseFn.entity.secondCategory = id2
+  getCourseList(courseFn)
+}
+
+// 选中课程难度的事件
+const checkLevel = (id3) => {
+  // 切换class
+  activeIndex3.value = id3
+  courseFn.entity.courseLevel = id3
+  getCourseList(courseFn)
+}
+
+// 选中全部分类1
+const checkCategory1All = () => {
+  activeIndex1.value = '1'
+  activeIndex2.value = '2'
+  getCourseList(courseOption())
+  getCategory2()
+}
+// 选中全部分类2
+const checkCategory2All = () => {
+  activeIndex2.value = '2'
+  courseFn.entity.secondCategory = ''
+  getCourseList(courseFn)
+}
+// 选中全部等级
+const checkLevelAll = () => {
+  activeIndex3.value = '0'
+  courseFn.entity.courseLevel = ''
+  getCourseList(courseFn)
+}
+
+// 综合/最新购买....
+let sortIndex = ref(0)
+const sortList = reactive([
+  { id: 0, name: '综合' },
+  { id: 1, name: '最新课程' },
+  { id: 2, name: '最多购买' },
+  { id: 3, name: '价格' }
+])
+let sortTop = ref(true)
+const changeSort = (item) => {
+  sortIndex.value = item.id
+  if (item.id === 0) {
+    courseFn.entity.sortBy = ''
+    getCourseList(courseFn)
+  }
+  if (item.id == 1) {
+    courseFn.entity.sortBy = 'time-asc'
+    getCourseList(courseFn)
+  }
+  if (item.id == 2) {
+    courseFn.entity.sortBy = 'purchase-asc'
+    getCourseList(courseFn)
+  }
+  if (item.id == 3) {
+    sortTop.value = !sortTop.value
+    if (sortTop.value) {
+      courseFn.entity.sortBy = 'price-asc'
+    } else {
+      courseFn.entity.sortBy = 'price-desc'
+    }
+    getCourseList(courseFn)
+  }
+}
+
+// 切换会员和免费课程
+let radioValue = ref('')
+const handeleRadio = (val) => {
+  if (val == '全部课程') {
+    courseFn.entity.isFree = ''
+    courseFn.entity.isMember = ''
+    getCourseList(courseFn)
+  } else if (val == '会员课程') {
+    courseFn.entity.isMember = 1
+    courseFn.entity.isFree = ''
+    getCourseList(courseFn)
+  } else {
+    courseFn.entity.isFree = 1
+    courseFn.entity.isMember = ''
+    getCourseList(courseFn)
+  }
+}
+
+// 分页器
+const handeleCurrent = (val) => {
+  courseFn.pageNum = val
+  getCourseList(courseFn)
+}
+</script> 
 
 <style scoped>
 .course-filter {
@@ -193,7 +360,7 @@ getCourseList(courseOption)
   cursor: pointer;
 }
 .filter-item ul li.filter-all {
-  width: 50px;
+  padding: 0 8px;
   line-height: 30px;
   text-align: center;
   color: #388fff;
@@ -220,11 +387,17 @@ getCourseList(courseOption)
 }
 .list-t ul li {
   display: flex;
+  cursor: pointer;
   align-items: center;
-  margin-right: 16px;
   font-size: 14px;
   font-weight: 400;
   color: #515759;
+}
+.list-t ul li i {
+  margin: 0 12px;
+}
+.list-t ul .sort {
+  color: #388fff;
 }
 .caret {
   display: flex;
@@ -232,12 +405,13 @@ getCourseList(courseOption)
 }
 .list-c {
   display: flex;
-  justify-content: space-between;
+  /* justify-content: space-between; */
   flex-wrap: wrap;
 }
 .list-c li {
   float: left;
   margin-top: 38px;
+  margin-right: 10px;
   width: 240px;
   height: 245px;
   background: #ffffff;
