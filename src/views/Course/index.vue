@@ -23,7 +23,7 @@
       <div class="filter-item">
         <div class="item-title">课程难度：</div>
         <ul>
-          <li class="filter-all">全部2222223332</li>
+          <li class="filter-all">全部真的牛鼻</li>
           <li v-for="item3 in levelList" :key="item3.id">{{ item3.name }}</li>
         </ul>
       </div>
